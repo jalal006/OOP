@@ -3,7 +3,6 @@ const string FileName = "tasks.txt";
 
 List<string> tasks = new List<string>();
 
-// Load saved tasks when the program starts
 if (File.Exists(FileName))
 {
     tasks.AddRange(File.ReadAllLines(FileName));
@@ -148,7 +147,7 @@ void SearchTasks(List<string> tasks)
 
     for (int i = 0; i < tasks.Count; i++)
     {
-        if (tasks[i].Contains(search, StringComparison.OrdinalIgnoreCase))
+        if (tasks[i].Contains(search))
         {
             Console.WriteLine($"{i + 1}. {tasks[i]}");
             found = true;
