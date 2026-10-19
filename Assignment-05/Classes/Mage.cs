@@ -22,7 +22,7 @@ namespace InheritanceMinigame.Classes
             else
             {
                 Console.WriteLine($"{Name} shouts '{BattleCry}' but is out of mana! They whack {target.Name} weakly with a staff.");
-                target.TakeDamage(5); 
+                target.TakeDamage(5);
             }
         }
     }
