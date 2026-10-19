@@ -1,13 +1,14 @@
 namespace InheritanceMinigame.Classes
 {
-    public class Character
+    public abstract class Character
     {
         public string Name { get; set; }
         public int Health { get; set; }
         public int MaxHealth { get; set; }
         public int AttackPower { get; set; }
 
-        public bool IsAlive => Health > 0; 
+        public bool IsAlive => Health > 0;
+        protected string BattleCry { get; set; } = "Charge!";
 
         protected Character(string name, int health, int attackPower)
         {
@@ -26,6 +27,6 @@ namespace InheritanceMinigame.Classes
             Console.WriteLine($"{Name} takes {damage} damage! (HP: {Health}/{MaxHealth})");
         }
 
-        public virtual void PerformAttack(Character target) { }
+        public abstract void PerformAttack(Character target);
     }
 }

@@ -5,11 +5,14 @@ namespace InheritanceMinigame.Classes
     public class Goblin : Character
     {
 
-    public Goblin(string name) : base(name, 60, 10) { }
+    public Goblin(string name) : base(name, 60, 10)
+        {
+            BattleCry = "Get them!";
+        }
 
     public override void PerformAttack(Character target)
         {
-            Console.WriteLine($"{Name} slashes with a rusty dagger!");
+            Console.WriteLine($"{Name} shouts '{BattleCry}' and slashes with a rusty dagger!");
             target.TakeDamage(AttackPower);
             
             if (Random.Shared.Next(0, 100) < 30)
