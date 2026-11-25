@@ -49,9 +49,36 @@ public sealed class SqlMaintenanceRepository(string connectionString) : IMainten
     public async Task<MaintenanceRecord> CreateAsync(MaintenanceRecord record, CancellationToken cancellationToken)
     {
         const string sql = """
-            INSERT dbo.MaintenanceRecords (EquipmentName, IssueDescription, ReportedDate, Status)
-            OUTPUT INSERTED.Id
-            VALUES (@equipmentName, @issueDescription, @reportedDate, @status);
+            -- Configured SQL Server accounts may have insert access without ALTER permission.
+            IF ISNULL(HAS_PERMS_BY_NAME(N'dbo.MaintenanceRecords', N'OBJECT', N'ALTER'), 0) = 0
+            BEGIN
+                INSERT dbo.MaintenanceRecords (EquipmentName, IssueDescription, ReportedDate, Status)
+                OUTPUT INSERTED.Id
+                VALUES (@equipmentName, @issueDescription, @reportedDate, @status);
+                RETURN;
+            END;
+
+            SET XACT_ABORT ON;
+            BEGIN TRANSACTION;
+
+            -- Keep the next ID and its insert together when requests run concurrently.
+            DECLARE @id int;
+            SELECT @id = ISNULL(MAX(Id), 0) + 1
+            FROM dbo.MaintenanceRecords WITH (TABLOCKX, HOLDLOCK);
+
+            SET IDENTITY_INSERT dbo.MaintenanceRecords ON;
+            BEGIN TRY
+                INSERT dbo.MaintenanceRecords (Id, EquipmentName, IssueDescription, ReportedDate, Status)
+                VALUES (@id, @equipmentName, @issueDescription, @reportedDate, @status);
+            END TRY
+            BEGIN CATCH
+                SET IDENTITY_INSERT dbo.MaintenanceRecords OFF;
+                THROW;
+            END CATCH;
+            SET IDENTITY_INSERT dbo.MaintenanceRecords OFF;
+
+            COMMIT TRANSACTION;
+            SELECT @id;
             """;
 
         await using var connection = new SqlConnection(connectionString);
