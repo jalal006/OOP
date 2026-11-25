@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MaintenanceLog.Contracts/MaintenanceLog.Contracts.csproj" />
+  <Project Path="MaintenanceLog.Api/MaintenanceLog.Api.csproj" />
+  <Project Path="MaintenanceLog.Console/MaintenanceLog.Console.csproj" />
+</Solution>
