@@ -67,11 +67,11 @@ namespace InheritanceMinigame
             dungeonEnemies.Enqueue(new Dragon("Ignis the Flame-Bringer"));
 
             Console.WriteLine($"{player.Name} enters the dungeon!");
-                        while (player.IsAlive && dungeonEnemies.Count > 0)
+            while (player.IsAlive && dungeonEnemies.Count > 0)
             {
                 Character currentEnemy = dungeonEnemies.Peek();
                 Console.WriteLine($"\n--------------------------------------------");
-                Console.WriteLine($"💥 A wild {currentEnemy.GetType().Name} appears: {currentEnemy.Name}!");
+                Console.WriteLine($"A wild {currentEnemy.GetType().Name} appears: {currentEnemy.Name}!");
                 Console.WriteLine($"--------------------------------------------");
 
                 while (player.IsAlive && currentEnemy.IsAlive)
@@ -90,7 +90,8 @@ namespace InheritanceMinigame
                     currentEnemy.PerformAttack(player);
                 }
             }
-                    Console.WriteLine("\n--- END OF GAME ---");
+            Console.WriteLine("\n--- END OF GAME ---");
+
             if (player.IsAlive)
                 Console.WriteLine("CONGRATULATIONS! You cleared the dungeon and won the game!");
             else
