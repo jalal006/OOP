@@ -4,8 +4,15 @@ using Microsoft.Data.SqlClient;
 
 namespace MaintenanceLog.Api;
 
-public sealed class SqlMaintenanceRepository(string connectionString) : IMaintenanceRepository
+public class SqlMaintenanceRepository : IMaintenanceRepository
 {
+    private readonly string connectionString;
+
+    public SqlMaintenanceRepository(string connectionString)
+    {
+        this.connectionString = connectionString;
+    }
+
     public async Task<IReadOnlyList<MaintenanceRecord>> ListAsync(string? search, CancellationToken cancellationToken)
     {
         const string sql = """
@@ -17,8 +24,12 @@ public sealed class SqlMaintenanceRepository(string connectionString) : IMainten
 
         await using var connection = new SqlConnection(connectionString);
         await using var command = new SqlCommand(sql, connection);
-        command.Parameters.Add("@search", SqlDbType.NVarChar, MaintenanceInput.EquipmentNameLimit).Value =
-            string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
+        SqlParameter searchParameter = command.Parameters.Add("@search", SqlDbType.NVarChar, MaintenanceInput.EquipmentNameLimit);
+        searchParameter.Value = DBNull.Value;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            searchParameter.Value = search.Trim();
+        }
         await connection.OpenAsync(cancellationToken);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
@@ -43,7 +54,11 @@ public sealed class SqlMaintenanceRepository(string connectionString) : IMainten
         command.Parameters.Add("@id", SqlDbType.Int).Value = id;
         await connection.OpenAsync(cancellationToken);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadRecord(reader) : null;
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return ReadRecord(reader);
+        }
+        return null;
     }
 
     public async Task<MaintenanceRecord> CreateAsync(MaintenanceRecord record, CancellationToken cancellationToken)
@@ -85,8 +100,13 @@ public sealed class SqlMaintenanceRepository(string connectionString) : IMainten
         await using var command = new SqlCommand(sql, connection);
         AddRecordParameters(command, record);
         await connection.OpenAsync(cancellationToken);
-        var id = (int)(await command.ExecuteScalarAsync(cancellationToken))!;
-        return record with { Id = id };
+        object? result = await command.ExecuteScalarAsync(cancellationToken);
+        if (result == null)
+        {
+            throw new InvalidOperationException("SQL Server did not return the new record ID.");
+        }
+        record.Id = (int)result;
+        return record;
     }
 
     public async Task<bool> UpdateAsync(MaintenanceRecord record, CancellationToken cancellationToken)
@@ -129,11 +149,15 @@ public sealed class SqlMaintenanceRepository(string connectionString) : IMainten
         command.Parameters.Add("@status", SqlDbType.TinyInt).Value = (byte)record.Status;
     }
 
-    private static MaintenanceRecord ReadRecord(SqlDataReader reader) =>
-        new(
-            reader.GetInt32(0),
-            reader.GetString(1),
-            reader.GetString(2),
-            reader.GetFieldValue<DateOnly>(3),
-            (MaintenanceStatus)reader.GetByte(4));
+    private static MaintenanceRecord ReadRecord(SqlDataReader reader)
+    {
+        return new MaintenanceRecord
+        {
+            Id = reader.GetInt32(0),
+            EquipmentName = reader.GetString(1),
+            IssueDescription = reader.GetString(2),
+            ReportedDate = reader.GetFieldValue<DateOnly>(3),
+            Status = (MaintenanceStatus)reader.GetByte(4)
+        };
+    }
 }

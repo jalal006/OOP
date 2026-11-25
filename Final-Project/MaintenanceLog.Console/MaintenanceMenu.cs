@@ -3,11 +3,19 @@ using MaintenanceLog.Contracts;
 
 namespace MaintenanceLog.Client;
 
-internal sealed class MaintenanceMenu(MaintenanceApiClient api)
+internal class MaintenanceMenu
 {
+    private readonly MaintenanceApiClient api;
+
+    public MaintenanceMenu(MaintenanceApiClient api)
+    {
+        this.api = api;
+    }
+
     public async Task RunAsync()
     {
         string? search = null;
+
         while (true)
         {
             try
@@ -15,7 +23,9 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
                 var records = await api.ListAsync(search);
                 ShowHome(records, search);
 
-                var choice = Read("Choose an option or enter a record ID: ").ToUpperInvariant();
+                string choice = Read("Choose an option or enter a record ID: ").ToUpperInvariant();
+                bool recordsChanged = false;
+
                 switch (choice)
                 {
                     case "Q":
@@ -24,47 +34,41 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
                         search = null;
                         break;
                     case "S":
-                        var term = Read("Equipment name (Enter to show all): ");
-                        if (term.Length <= MaintenanceInput.EquipmentNameLimit)
+                        string name = Read("Equipment name (Enter to show all): ");
+                        if (name.Length <= MaintenanceInput.EquipmentNameLimit)
                         {
-                            search = string.IsNullOrEmpty(term) ? null : term;
+                            search = name;
                         }
                         else
                         {
-                            Console.WriteLine("Search text must be 100 characters or fewer.");
+                            Console.WriteLine($"Search text must be {MaintenanceInput.EquipmentNameLimit} characters or fewer.");
                         }
                         break;
                     case "N":
-                        if (await ShowDetailsAsync(null))
-                        {
-                            search = null;
-                        }
+                        recordsChanged = await ShowNewDetailsAsync();
+                        break;
+                    case "E":
+                        string editId = Read("Enter the ID of the record to edit: ");
+                        recordsChanged = await OpenRecordAsync(editId, records, editImmediately: true);
                         break;
                     default:
-                        if (int.TryParse(choice, out var id) && records.Any(record => record.Id == id))
-                        {
-                            var record = await api.GetAsync(id);
-                            if (record is null)
-                            {
-                                Console.WriteLine("That record is no longer available.");
-                            }
-                            else if (await ShowDetailsAsync(record))
-                            {
-                                search = null;
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine("Choose a menu option or an ID from the list.");
-                        }
+                        recordsChanged = await OpenRecordAsync(choice, records, editImmediately: false);
                         break;
+                }
+
+                if (recordsChanged)
+                {
+                    search = null;
                 }
             }
             catch (HttpRequestException exception)
             {
-                var message = exception.StatusCode is { } status
-                    ? $"The API returned HTTP {(int)status} ({status})."
-                    : "Could not reach the API. Check that MaintenanceLog.Api is running.";
+                string message = "Could not reach the API. Check that MaintenanceLog.Api is running.";
+                if (exception.StatusCode.HasValue)
+                {
+                    message = $"The API returned HTTP {(int)exception.StatusCode.Value} ({exception.StatusCode.Value}).";
+                }
+
                 if (!Retry(message))
                 {
                     return;
@@ -84,44 +88,110 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
     {
         Console.WriteLine();
         Console.WriteLine("=== Equipment Maintenance Log | Home ===");
-        Console.WriteLine(search is null ? "All records" : $"Search results for \"{search}\"");
+        if (string.IsNullOrEmpty(search))
+        {
+            Console.WriteLine("All records");
+        }
+        else
+        {
+            Console.WriteLine($"Search results for \"{search}\"");
+        }
+
         if (records.Count == 0)
         {
             Console.WriteLine("No records found.");
         }
-        foreach (var record in records)
+
+        foreach (MaintenanceRecord record in records)
         {
             Console.WriteLine($"{record.Id,4}  {record.ReportedDate:yyyy-MM-dd}  "
                 + $"[{StatusLabel(record.Status)}]  {record.EquipmentName}");
         }
-        Console.WriteLine("[S] Search  [A] Show all  [N] New  [Q] Quit");
+
+        Console.WriteLine("[S] Search  [A] Show all  [N] New  [E] Edit  [Q] Quit");
     }
 
-    private async Task<bool> ShowDetailsAsync(MaintenanceRecord? record)
+    private async Task<bool> OpenRecordAsync(string choice, IReadOnlyList<MaintenanceRecord> records, bool editImmediately)
+    {
+        if (int.TryParse(choice, out int id))
+        {
+            foreach (MaintenanceRecord item in records)
+            {
+                if (item.Id == id)
+                {
+                    MaintenanceRecord? record = await api.GetAsync(id);
+                    if (record == null)
+                    {
+                        Console.WriteLine("That record is no longer available.");
+                        return false;
+                    }
+
+                    return await ShowDetailsAsync(record, editImmediately);
+                }
+            }
+        }
+
+        Console.WriteLine("Choose a menu option or an ID from the list.");
+        return false;
+    }
+
+    private async Task<bool> ShowNewDetailsAsync()
     {
         Console.WriteLine();
         Console.WriteLine("=== Equipment Maintenance Log | Details ===");
-        Console.WriteLine(record is null ? "New record" : $"Record #{record.Id}");
-        Console.WriteLine($"Equipment:   {record?.EquipmentName ?? ""}");
-        Console.WriteLine($"Issue:       {record?.IssueDescription ?? ""}");
-        Console.WriteLine($"Reported on: {record?.ReportedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? ""}");
-        Console.WriteLine($"Status:      {(record is null ? "" : StatusLabel(record.Status))}");
-        Console.WriteLine(record is null ? "[N] New  [B] Back" : "[E] Edit  [D] Delete  [B] Back");
+        Console.WriteLine("New record");
+        Console.WriteLine("Equipment:   ");
+        Console.WriteLine("Issue:       ");
+        Console.WriteLine("Reported on: ");
+        Console.WriteLine("Status:      ");
+        Console.WriteLine("[N] New  [B] Back");
 
+        while (true)
+        {
+            string choice = Read("Choose an option: ").ToUpperInvariant();
+            if (choice == "N")
+            {
+                MaintenanceInput input = ReadFields(null);
+                await api.CreateAsync(input);
+                Console.WriteLine("Record created.");
+                return true;
+            }
+            if (choice == "B")
+            {
+                return false;
+            }
+
+            Console.WriteLine("Choose N or B.");
+        }
+    }
+
+    private async Task<bool> ShowDetailsAsync(MaintenanceRecord record, bool editImmediately)
+    {
+        Console.WriteLine();
+        Console.WriteLine("=== Equipment Maintenance Log | Details ===");
+        Console.WriteLine($"Record #{record.Id}");
+        Console.WriteLine($"Equipment:   {record.EquipmentName}");
+        Console.WriteLine($"Issue:       {record.IssueDescription}");
+        Console.WriteLine($"Reported on: {record.ReportedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
+        Console.WriteLine($"Status:      {StatusLabel(record.Status)}");
+
+        if (editImmediately)
+        {
+            await EditRecordAsync(record);
+            return true;
+        }
+
+        Console.WriteLine("[E] Edit  [D] Delete  [B] Back");
         while (true)
         {
             switch (Read("Choose an option: ").ToUpperInvariant())
             {
-                case "N" when record is null:
-                    await api.CreateAsync(ReadFields(null));
-                    Console.WriteLine("Record created.");
+                case "E":
+                    await EditRecordAsync(record);
                     return true;
-                case "E" when record is not null:
-                    await api.UpdateAsync(record.Id, ReadFields(record));
-                    Console.WriteLine("Record updated.");
-                    return true;
-                case "D" when record is not null:
-                    if (Read("Delete this record? [y/N]: ").Equals("y", StringComparison.OrdinalIgnoreCase))
+                case "D":
+                    string confirm = Read("Delete this record? [y/N]: ");
+                    if (confirm.Equals("y", StringComparison.OrdinalIgnoreCase))
                     {
                         await api.DeleteAsync(record.Id);
                         Console.WriteLine("Record deleted.");
@@ -132,18 +202,26 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
                 case "B":
                     return false;
                 default:
-                    Console.WriteLine("Choose an option shown in Details.");
+                    Console.WriteLine("Choose E, D, or B.");
                     break;
             }
         }
     }
 
+    private async Task EditRecordAsync(MaintenanceRecord record)
+    {
+        MaintenanceInput input = ReadFields(record);
+        await api.UpdateAsync(record.Id, input);
+        Console.WriteLine("Record updated.");
+    }
+
     private static MaintenanceInput ReadFields(MaintenanceRecord? existing)
     {
-        if (existing is not null)
+        if (existing != null)
         {
             Console.WriteLine("Press Enter to keep the current value for a field.");
         }
+
         return new MaintenanceInput
         {
             EquipmentName = ReadText("Equipment name", MaintenanceInput.EquipmentNameLimit, existing?.EquipmentName),
@@ -157,8 +235,8 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
     {
         while (true)
         {
-            var text = Read($"{label}: ");
-            if (text.Length == 0 && existing is not null)
+            string text = Read($"{label}: ");
+            if (text.Length == 0 && existing != null)
             {
                 return existing;
             }
@@ -174,12 +252,12 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
     {
         while (true)
         {
-            var text = Read("Reported date (YYYY-MM-DD): ");
+            string text = Read("Reported date (YYYY-MM-DD): ");
             if (text.Length == 0 && existing.HasValue)
             {
                 return existing.Value;
             }
-            if (DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            if (DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date))
             {
                 return date;
             }
@@ -191,12 +269,12 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
     {
         while (true)
         {
-            var text = Read("Status ([1] Open, [2] In Progress, [3] Resolved): ");
+            string text = Read("Status ([1] Open, [2] In Progress, [3] Resolved): ");
             if (text.Length == 0 && existing.HasValue)
             {
                 return existing.Value;
             }
-            if (int.TryParse(text, out var value) && Enum.IsDefined((MaintenanceStatus)value))
+            if (int.TryParse(text, out int value) && Enum.IsDefined((MaintenanceStatus)value))
             {
                 return (MaintenanceStatus)value;
             }
@@ -204,8 +282,14 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
         }
     }
 
-    private static string StatusLabel(MaintenanceStatus status) =>
-        status == MaintenanceStatus.InProgress ? "In Progress" : status.ToString();
+    private static string StatusLabel(MaintenanceStatus status)
+    {
+        if (status == MaintenanceStatus.InProgress)
+        {
+            return "In Progress";
+        }
+        return status.ToString();
+    }
 
     private static bool Retry(string message)
     {
@@ -216,6 +300,11 @@ internal sealed class MaintenanceMenu(MaintenanceApiClient api)
     private static string Read(string prompt)
     {
         Console.Write(prompt);
-        return (Console.ReadLine() ?? throw new EndOfStreamException()).Trim();
+        string? input = Console.ReadLine();
+        if (input == null)
+        {
+            throw new EndOfStreamException();
+        }
+        return input.Trim();
     }
 }

@@ -6,21 +6,31 @@ using MaintenanceLog.Contracts;
 
 namespace MaintenanceLog.Client;
 
-internal sealed class MaintenanceApiClient(HttpClient httpClient)
+internal class MaintenanceApiClient
 {
     private const string RecordsPath = "api/maintenance-records";
+    private readonly HttpClient httpClient;
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter(allowIntegerValues: false) }
     };
 
+    public MaintenanceApiClient(HttpClient httpClient)
+    {
+        this.httpClient = httpClient;
+    }
+
     public async Task<IReadOnlyList<MaintenanceRecord>> ListAsync(string? search)
     {
-        var path = string.IsNullOrEmpty(search)
-            ? RecordsPath
-            : $"{RecordsPath}?search={Uri.EscapeDataString(search)}";
-        return await httpClient.GetFromJsonAsync<List<MaintenanceRecord>>(path, JsonOptions) ?? [];
+        string path = RecordsPath;
+        if (!string.IsNullOrEmpty(search))
+        {
+            path = $"{RecordsPath}?search={Uri.EscapeDataString(search)}";
+        }
+
+        List<MaintenanceRecord>? records = await httpClient.GetFromJsonAsync<List<MaintenanceRecord>>(path, JsonOptions);
+        return records ?? new List<MaintenanceRecord>();
     }
 
     public async Task<MaintenanceRecord?> GetAsync(int id)

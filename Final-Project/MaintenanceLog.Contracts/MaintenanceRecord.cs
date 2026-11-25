@@ -1,8 +1,10 @@
 namespace MaintenanceLog.Contracts;
 
-public sealed record MaintenanceRecord(
-    int Id,
-    string EquipmentName,
-    string IssueDescription,
-    DateOnly ReportedDate,
-    MaintenanceStatus Status);
+public class MaintenanceRecord
+{
+    public int Id { get; set; }
+    public string EquipmentName { get; set; } = "";
+    public string IssueDescription { get; set; } = "";
+    public DateOnly ReportedDate { get; set; }
+    public MaintenanceStatus Status { get; set; }
+}

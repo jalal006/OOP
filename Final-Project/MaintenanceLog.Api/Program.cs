@@ -3,9 +3,13 @@ using MaintenanceLog.Api;
 using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
-var configuredConnection = builder.Configuration.GetConnectionString("Maintenance");
-var useLocalDb = string.IsNullOrWhiteSpace(configuredConnection);
-var connectionString = useLocalDb ? MaintenanceDatabase.LocalConnectionString : configuredConnection!;
+string? connectionString = builder.Configuration.GetConnectionString("Maintenance");
+bool useLocalDb = false;
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = MaintenanceDatabase.LocalConnectionString;
+    useLocalDb = true;
+}
 
 builder.Services.AddSingleton<IMaintenanceRepository>(new SqlMaintenanceRepository(connectionString));
 builder.Services.AddControllers().AddJsonOptions(options =>
