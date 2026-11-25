@@ -6,11 +6,14 @@ namespace InheritanceMinigame.Classes
     {
         public int ShieldBlock { get; set; } = 4;
 
-        public Warrior(string name) : base(name, 120, 15) { }
-
-        public override void PerformAttack(Character target)
+        public Warrior(string name) : base(name, 120, 15)
         {
-            Console.WriteLine($"{Name} swings a heavy greatsword at {target.Name}!");
+            BattleCry = "For the kingdom!";
+        }
+
+        public sealed override void PerformAttack(Character target)
+        {
+            Console.WriteLine($"{Name} shouts '{BattleCry}' and swings a heavy greatsword at {target.Name}!");
             target.TakeDamage(AttackPower);
         }
         
