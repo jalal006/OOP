@@ -16,7 +16,7 @@ namespace InheritanceMinigame.Classes
             Console.WriteLine($"{Name} shouts '{BattleCry}' and swings a heavy greatsword at {target.Name}!");
             target.TakeDamage(AttackPower);
         }
-        
+
         public override void TakeDamage(int damage)
         {
             int finalDamage = Math.Max(1, damage - ShieldBlock);
