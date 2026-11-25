@@ -49,10 +49,14 @@ internal class MaintenanceMenu
                         break;
                     case "E":
                         string editId = Read("Enter the ID of the record to edit: ");
-                        recordsChanged = await OpenRecordAsync(editId, records, editImmediately: true);
+                        recordsChanged = await OpenRecordAsync(editId, records, "E");
+                        break;
+                    case "D":
+                        string deleteId = Read("Enter the ID of the record to delete: ");
+                        recordsChanged = await OpenRecordAsync(deleteId, records, "D");
                         break;
                     default:
-                        recordsChanged = await OpenRecordAsync(choice, records, editImmediately: false);
+                        recordsChanged = await OpenRecordAsync(choice, records);
                         break;
                 }
 
@@ -108,10 +112,10 @@ internal class MaintenanceMenu
                 + $"[{StatusLabel(record.Status)}]  {record.EquipmentName}");
         }
 
-        Console.WriteLine("[S] Search  [A] Show all  [N] New  [E] Edit  [Q] Quit");
+        Console.WriteLine("[S] Search  [A] Show all  [N] New  [E] Edit  [D] Delete  [Q] Quit");
     }
 
-    private async Task<bool> OpenRecordAsync(string choice, IReadOnlyList<MaintenanceRecord> records, bool editImmediately)
+    private async Task<bool> OpenRecordAsync(string choice, IReadOnlyList<MaintenanceRecord> records, string? shortcut = null)
     {
         if (int.TryParse(choice, out int id))
         {
@@ -126,7 +130,7 @@ internal class MaintenanceMenu
                         return false;
                     }
 
-                    return await ShowDetailsAsync(record, editImmediately);
+                    return await ShowDetailsAsync(record, shortcut);
                 }
             }
         }
@@ -165,7 +169,7 @@ internal class MaintenanceMenu
         }
     }
 
-    private async Task<bool> ShowDetailsAsync(MaintenanceRecord record, bool editImmediately)
+    private async Task<bool> ShowDetailsAsync(MaintenanceRecord record, string? shortcut)
     {
         Console.WriteLine();
         Console.WriteLine("=== Equipment Maintenance Log | Details ===");
@@ -175,10 +179,14 @@ internal class MaintenanceMenu
         Console.WriteLine($"Reported on: {record.ReportedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
         Console.WriteLine($"Status:      {StatusLabel(record.Status)}");
 
-        if (editImmediately)
+        if (shortcut == "E")
         {
             await EditRecordAsync(record);
             return true;
+        }
+        if (shortcut == "D")
+        {
+            return await DeleteRecordAsync(record);
         }
 
         Console.WriteLine("[E] Edit  [D] Delete  [B] Back");
@@ -190,14 +198,10 @@ internal class MaintenanceMenu
                     await EditRecordAsync(record);
                     return true;
                 case "D":
-                    string confirm = Read("Delete this record? [y/N]: ");
-                    if (confirm.Equals("y", StringComparison.OrdinalIgnoreCase))
+                    if (await DeleteRecordAsync(record))
                     {
-                        await api.DeleteAsync(record.Id);
-                        Console.WriteLine("Record deleted.");
                         return true;
                     }
-                    Console.WriteLine("Deletion cancelled.");
                     break;
                 case "B":
                     return false;
@@ -213,6 +217,20 @@ internal class MaintenanceMenu
         MaintenanceInput input = ReadFields(record);
         await api.UpdateAsync(record.Id, input);
         Console.WriteLine("Record updated.");
+    }
+
+    private async Task<bool> DeleteRecordAsync(MaintenanceRecord record)
+    {
+        string confirm = Read("Delete this record? [y/N]: ");
+        if (!confirm.Equals("y", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Deletion cancelled.");
+            return false;
+        }
+
+        await api.DeleteAsync(record.Id);
+        Console.WriteLine("Record deleted.");
+        return true;
     }
 
     private static MaintenanceInput ReadFields(MaintenanceRecord? existing)

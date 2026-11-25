@@ -22,7 +22,7 @@ dotnet run --project MaintenanceLog.Console
 
 ## Controls
 
-- **Home** — Enter a record ID to open Details, or press **E** and enter an ID to edit it directly. Press **S** to search, **A** to show all records, **N** to add a record, or **Q** to quit.
+- **Home** — Enter a record ID to open Details, or press **E** to edit or **D** to delete and then enter the ID. Press **S** to search, **A** to show all records, **N** to add a record, or **Q** to quit. Deleting a report requires confirmation.
 - **Details** — Press **E** to edit an existing record, **D** to delete it, or **B** to go back. In empty Details, press **N** to enter a new record. Home refreshes after each change.
 
 ## Project structure
