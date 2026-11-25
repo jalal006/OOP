@@ -17,13 +17,14 @@ namespace InheritanceMinigame.Classes
             Health = health;
             AttackPower = attackPower;
         }
+
         public virtual void TakeDamage(int damage)
         {
             Health -= damage;
-            
+
             if (Health < 0)
                 Health = 0;
-            
+
             Console.WriteLine($"{Name} takes {damage} damage! (HP: {Health}/{MaxHealth})");
         }
 
