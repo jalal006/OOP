@@ -48,12 +48,10 @@ internal class MaintenanceMenu
                         recordsChanged = await ShowNewDetailsAsync();
                         break;
                     case "E":
-                        string editId = Read("Enter the ID of the record to edit: ");
-                        recordsChanged = await OpenRecordAsync(editId, records, "E");
-                        break;
                     case "D":
-                        string deleteId = Read("Enter the ID of the record to delete: ");
-                        recordsChanged = await OpenRecordAsync(deleteId, records, "D");
+                        string action = choice == "E" ? "edit" : "delete";
+                        string recordId = Read($"Enter the ID of the record to {action}: ");
+                        recordsChanged = await OpenRecordAsync(recordId, records, choice);
                         break;
                     default:
                         recordsChanged = await OpenRecordAsync(choice, records);
@@ -117,25 +115,31 @@ internal class MaintenanceMenu
 
     private async Task<bool> OpenRecordAsync(string choice, IReadOnlyList<MaintenanceRecord> records, string? shortcut = null)
     {
-        if (int.TryParse(choice, out int id))
+        const string invalidChoice = "Choose a menu option or an ID from the list.";
+        if (!int.TryParse(choice, out int id))
         {
-            foreach (MaintenanceRecord item in records)
-            {
-                if (item.Id == id)
-                {
-                    MaintenanceRecord? record = await api.GetAsync(id);
-                    if (record == null)
-                    {
-                        Console.WriteLine("That record is no longer available.");
-                        return false;
-                    }
-
-                    return await ShowDetailsAsync(record, shortcut);
-                }
-            }
+            Console.WriteLine(invalidChoice);
+            return false;
         }
 
-        Console.WriteLine("Choose a menu option or an ID from the list.");
+        foreach (MaintenanceRecord item in records)
+        {
+            if (item.Id != id)
+            {
+                continue;
+            }
+
+            MaintenanceRecord? record = await api.GetAsync(id);
+            if (record == null)
+            {
+                Console.WriteLine("That record is no longer available.");
+                return false;
+            }
+
+            return await ShowDetailsAsync(record, shortcut);
+        }
+
+        Console.WriteLine(invalidChoice);
         return false;
     }
 
